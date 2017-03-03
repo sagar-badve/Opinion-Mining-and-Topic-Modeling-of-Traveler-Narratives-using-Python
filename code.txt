@@ -92,7 +92,7 @@ def sentiment_analysis(processed_docs,name):
     anew_valence_list=[]
     
     for item in doc_list:
-        anew_senti = {'arousal': 0.0, 'valence': 0.0, 'dominance': 0.0}
+        anew_senti = {'arousal': 0.0, 'valence': 0.0}
         for word in item:
             temp = anew.sentiment(word)
            
