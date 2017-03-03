@@ -1,0 +1,185 @@
+#This repository contains following implementations:
+#Opinion Mining using Sentiment Analysis (3 Methods - AFINN scores, Hu and Liu Lexicon scores and ANEW scores).
+#Topic Modeling: LDA using TF-IDF.
+#Subjectivity and Polarity calculation using TextBlob.
+#Topic Modeling: NMF using TF-IDF.
+################################################################################################################################################################# 
+from textblob import TextBlob
+import string
+import textwrap
+from nltk.corpus import stopwords
+from gensim import corpora, models
+ 
+from anew_module import anew 
+
+with open("filename.txt", encoding="utf-8", mode="r") as my_file:
+    content = my_file.read()
+    my_file.close()
+
+list1 = textwrap.wrap(content)
+
+
+stop_words = set(stopwords.words('english'))
+punct = set(string.punctuation) 
+def preprocessing(doc):
+    stop_words_removed = " ".join([i for i in doc.lower().split() if i not in stop_words])
+    punct_removed = ''.join(ch for ch in stop_words_removed if ch not in punct)
+    return punct_removed
+
+processed_docs = [preprocessing(line).split() for line in list1]
+                  
+file = open("AFINN.txt")
+afinn=file.readlines()
+
+scores={}
+for l in afinn:
+    l2=l.replace("\n","")
+    key,value=l2.split("\t")
+    scores[key]=int(value)
+
+file = open("positive-words1.txt")
+p = file.read()
+pos = p.split("\n")
+
+
+file = open("negative-words1.txt")
+n = file.read()
+neg = n.split("\n")
+
+#Sentiment Analysis Function: AFINN scores, Hu and Liu Lexicon scores and ANEW scores    
+def sentiment_analysis(processed_docs,name):
+    print("SENTIMENT SCORE FOR:  ", name)
+    doc_list = processed_docs
+    sentiment = []
+    for item in doc_list:
+        item_score = 0
+        for word in item:
+            for i in scores:
+                if(word==i):
+                    value = scores[i]
+                    item_score = item_score + value
+        sentiment.append(item_score)     
+    s = sum(sentiment)     
+    print("1. Overall Afinn Score:", s)
+    
+    pos_sent = []
+    for item in doc_list:
+        ps_score = 0
+        for word in item:
+            for i in pos:
+                value = 0            
+                if(word==i):
+                    value = 1
+                    ps_score = ps_score+value
+        pos_sent.append(ps_score)
+    p1 = sum(pos_sent)     
+    print("2.1  Lexicon Total Positive Score:", p1)
+      
+    neg_sent = []
+    for item in doc_list:
+        ns_score=0
+        for word in item:
+            for i in neg:
+                value = 0            
+                if(word==i):
+                    value=-1
+                    ns_score =ns_score+value
+        neg_sent.append(ns_score)    
+    n1=sum(neg_sent)
+    print("2.2  Lexicon Total Negative Score:", n1)
+    
+    anew_arousal_list=[]
+    anew_valence_list=[]
+    
+    for item in doc_list:
+        anew_senti = {'arousal': 0.0, 'valence': 0.0, 'dominance': 0.0}
+        for word in item:
+            temp = anew.sentiment(word)
+           
+            anew_senti["arousal"] = anew_senti["arousal"]+temp['arousal']
+           
+            anew_senti["valence"] = anew_senti["valence"]+temp['valence']
+            
+        a = round(anew_senti["arousal"],2)
+        v = round(anew_senti["valence"],2)
+        
+        anew_arousal_list.append(a)
+        anew_valence_list.append(v)
+        
+    p_a = sum(anew_arousal_list)
+    p_v = sum(anew_valence_list)
+
+    print("3.1 ANEW_valence : ",round(p_v,2))
+    print("3.2 ANEW_arousal : ",round(p_a,2),'\n')
+
+df = sentiment_analysis(processed_docs, name = "Some_Name")
+
+text_content = " ".join(list1)
+text = TextBlob(text_content)
+print(text.sentiment)					#This gives Subjectivity and Polarity
+
+
+#Topic Modeling: LDA using TF-IDF
+dictionary = corpora.Dictionary(processed_docs)
+corpus = [dictionary.doc2bow(item) for item in processed_docs]
+tfidf = models.TfidfModel(corpus)
+corpus_tfidf = tfidf[corpus]
+model = models.ldamodel.LdaModel(corpus_tfidf, num_topics=5, id2word=dictionary, update_every=1, passes=100)
+
+print("LDA model topics:\n")
+topics_found = model.print_topics(5)
+counter = 1
+for t in topics_found:
+    print("\nTopic# " + str(counter) + ": ")
+    print(t)
+    counter = counter + 1
+
+##################################################################################################################################################################
+#Topic Modeling: NMF using TF-IDF
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+import numpy as np
+#from nltk.corpus import stopwords
+import string
+import textwrap
+from sklearn import decomposition
+
+with open("filename.txt", encoding="utf-8", mode="r") as my_file:
+    content = my_file.read()
+    my_file.close()
+
+list1 = textwrap.wrap(content)
+
+p=string.punctuation
+n=string.digits
+x=p+n+'\n'
+n_x=len(x)
+table =str.maketrans(x,n_x*" ")
+
+docs=[]
+
+for item in list1:
+    temp = item.translate(table)
+    docs.append(temp.lower())
+    
+corpus = docs
+    
+vectorizer = TfidfVectorizer(stop_words = 'english', min_df = 2)
+dtm = vectorizer.fit_transform(corpus)
+
+vocab = np.array(vectorizer.get_feature_names())
+
+num_topics = 5
+num_top_words = 5
+clf = decomposition.NMF(n_components = num_topics, random_state=0)
+doctopic = clf.fit_transform(dtm)
+topic_words = []
+for topic in clf.components_:
+    word_idx = np.argsort(topic)[::-1][0:num_top_words]
+    topic_words.append([vocab[i] for i in word_idx])
+    
+    
+for t in range(len(topic_words)):
+    print("Topic {}: {}".format(t, ' '.join(topic_words[t][:5])))
+
+##################################################################################################################################################################
